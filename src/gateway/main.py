@@ -19,3 +19,7 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+@app.get("/boom")
+def boom():
+    raise RuntimeError("boom")
