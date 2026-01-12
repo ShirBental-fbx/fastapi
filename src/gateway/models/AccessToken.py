@@ -2,8 +2,8 @@
 
 from __future__ import absolute_import
 from common.db_handling.EncryptedString import EncryptedString
-from models.Client import Client
-from models.TimestampAddon import TimestampAddon
+from gateway.models.Client import Client
+from gateway.models.TimestampAddon import TimestampAddon
 from Core import api_db
 
 import os

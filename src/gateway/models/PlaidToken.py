@@ -9,8 +9,8 @@ from secrets import token_urlsafe
 from sqlalchemy import Index
 
 from common.db_handling.EncryptedString import EncryptedString
-from models.OldPlaidToken import OldPlaidToken
-from models.TimestampAddon import TimestampAddon
+from gateway.models.OldPlaidToken import OldPlaidToken
+from gateway.models.TimestampAddon import TimestampAddon
 from Core import api_db
 import os
 

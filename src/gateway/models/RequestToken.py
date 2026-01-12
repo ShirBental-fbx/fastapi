@@ -1,8 +1,8 @@
 ##### Imports ##################################################################
 
 from __future__ import absolute_import
-from models.Client import Client
-from models.TimestampAddon import TimestampAddon
+from gateway.models.Client import Client
+from gateway.models.TimestampAddon import TimestampAddon
 from Core import api_db
 
 ##### Globals ##################################################################
