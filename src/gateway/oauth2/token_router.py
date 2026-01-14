@@ -1,3 +1,10 @@
+"""
+OAuth2 Token endpoints using external authentication service.
+
+This module provides token endpoints that delegate to an external
+authentication service (fundbox.sdk.authentication).
+"""
+
 from __future__ import annotations
 
 from dataclasses import asdict
@@ -6,20 +13,11 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from fundbox.common.service_client import RemoteException
-from fundbox.sdk.authentication.client import get_authentication_service_api_client
-from fundbox.sdk.authentication.dto.oauth2.token_request import (
-    TokenRequest,
-    GrantType,
-    RevokeTokenRequest,
-)
+router = APIRouter(prefix="/oauth", tags=["oauth2-external"])
 
-router = APIRouter(prefix="/oauth", tags=["oauth2"])
-
-
-# ---------- Request models (FastAPI replaces sanitize_flask_request_json) ----------
 
 class TokenPayload(BaseModel):
+    """Request body for token endpoint."""
     grant_type: str
     client_id: Optional[str] = None
     client_secret: Optional[str] = None
@@ -27,12 +25,26 @@ class TokenPayload(BaseModel):
 
 
 class RevokePayload(BaseModel):
+    """Request body for token revocation endpoint."""
     client_id: Optional[str] = None
     client_secret: Optional[str] = None
     token: Optional[str] = None
 
 
-def _get_grant_type(grant_type: str) -> GrantType:
+def _get_grant_type(grant_type: str):
+    """
+    Convert grant type string to SDK enum.
+    
+    This function requires fundbox-sdk to be installed.
+    """
+    try:
+        from fundbox.sdk.authentication.dto.oauth2.token_request import GrantType
+    except ImportError:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="External authentication service not configured"
+        )
+    
     if grant_type == "client_credentials":
         return GrantType.CLIENT_CREDENTIALS
     if grant_type == "refresh_token":
@@ -43,10 +55,24 @@ def _get_grant_type(grant_type: str) -> GrantType:
     )
 
 
-# ---------- Endpoints ----------
-
-@router.post("/token")
-def issue_token(payload: TokenPayload):
+@router.post("/external/token")
+def issue_token_external(payload: TokenPayload):
+    """
+    Issue token via external authentication service.
+    
+    This endpoint delegates token issuance to the Fundbox authentication
+    service for client credentials and refresh token grants.
+    """
+    try:
+        from fundbox.common.service_client import RemoteException
+        from fundbox.sdk.authentication.client import get_authentication_service_api_client
+        from fundbox.sdk.authentication.dto.oauth2.token_request import TokenRequest
+    except ImportError:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="External authentication service not configured"
+        )
+    
     try:
         req = TokenRequest(
             grant_type=_get_grant_type(payload.grant_type),
@@ -63,8 +89,23 @@ def issue_token(payload: TokenPayload):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(ex))
 
 
-@router.post("/revoke", status_code=status.HTTP_204_NO_CONTENT)
-def revoke_token(payload: RevokePayload):
+@router.post("/external/revoke", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_token_external(payload: RevokePayload):
+    """
+    Revoke token via external authentication service.
+    
+    This endpoint delegates token revocation to the Fundbox authentication service.
+    """
+    try:
+        from fundbox.common.service_client import RemoteException
+        from fundbox.sdk.authentication.client import get_authentication_service_api_client
+        from fundbox.sdk.authentication.dto.oauth2.token_request import RevokeTokenRequest
+    except ImportError:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="External authentication service not configured"
+        )
+    
     try:
         req = RevokeTokenRequest(
             client_id=payload.client_id,

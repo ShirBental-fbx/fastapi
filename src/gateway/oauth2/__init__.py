@@ -1,14 +1,23 @@
-from authlib.integrations.flask_oauth2 import AuthorizationServer, ResourceProtector
-from authlib.integrations.sqla_oauth2 import (
-    create_query_client_func,
-    create_revocation_endpoint,
-    create_bearer_token_validator,
-)
-from authlib.oauth2.rfc7636 import CodeChallenge
+"""
+OAuth2 module.
 
-from gateway.core import api_db
-from gateway.models.OAuth2Client import OAuth2Client
-from gateway.models.OAuth2Token import OAuth2Token
-from gateway.models.oauth2.AuthorizationCodeGrant import AuthorizationCodeGrant
-from gateway.models.oauth2.OAuth2Manager import save_token
-from gateway.models.oauth2.RefreshTokenGrant import RefreshTokenGrant
+Provides OAuth2 authorization server functionality using Authlib.
+"""
+
+from gateway.oauth2.authorization_code_grant import AuthorizationCodeGrant
+from gateway.oauth2.oauth2_manager import create_client
+from gateway.oauth2.refresh_token_grant import RefreshTokenGrant
+from gateway.oauth2.router import router as oauth2_router
+from gateway.oauth2.server import authorization_server, get_authorization_server
+from gateway.oauth2.storage import query_client, save_token
+
+__all__ = [
+    "AuthorizationCodeGrant",
+    "RefreshTokenGrant",
+    "authorization_server",
+    "get_authorization_server",
+    "oauth2_router",
+    "query_client",
+    "save_token",
+    "create_client",
+]

@@ -1,32 +1,229 @@
+"""
+OAuth2 authorization router.
+
+Implements the OAuth2 authorization endpoints:
+- GET /oauth/authorize - Authorization request (shows consent page)
+- POST /oauth/authorize - Authorization grant (user consents)
+- POST /oauth/token - Token endpoint (exchange code for tokens)
+- POST /oauth/revoke - Token revocation endpoint
+"""
+
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from typing import Annotated
 
-from gateway.oauth2.server import build_authorization_server
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from sqlalchemy.orm import Session
+from starlette.templating import Jinja2Templates
+
+from gateway.db import get_db
+from gateway.db.context import set_db
 from gateway.oauth2.asgi_request import ASGIOAuthRequest
+from gateway.oauth2.server import authorization_server
+from gateway.oauth2.storage import query_client
 
-router = APIRouter()
-server = build_authorization_server()
+router = APIRouter(prefix="/oauth", tags=["oauth2"])
 
-@router.get("/oauth/authorize")
-async def authorize_get(request: Request):
-    oauth_req = await ASGIOAuthRequest.from_starlette(request)
-    return HTMLResponse("TODO authorize page")
+# Templates for authorization page
+# Templates directory should be at src/gateway/templates
+import os
+TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "..", "templates")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
-@router.post("/oauth/authorize")
-async def authorize_post(request: Request):
-    oauth_req = await ASGIOAuthRequest.from_starlette(request)
-    # create_authorization_response(...) של core
-    return Response(content=b"TODO", status_code=501)
 
-@router.post("/oauth/token")
-async def issue_token(request: Request):
-    oauth_req = await ASGIOAuthRequest.from_starlette(request)
-    # create_token_response(...)
-    return Response(content=b"TODO", status_code=501)
+@router.get("/authorize")
+async def authorize_get(
+    request: Request,
+    db: Session = Depends(get_db),
+    client_id: str = Query(...),
+    redirect_uri: str = Query(...),
+    response_type: str = Query(...),
+    scope: str = Query(default=""),
+    state: str = Query(default=""),
+    code_challenge: str | None = Query(default=None),
+    code_challenge_method: str | None = Query(default=None),
+):
+    """
+    Handle GET request to authorization endpoint.
+    
+    Displays the consent page for the user to authorize the client.
+    In a real implementation, this would first authenticate the user.
+    """
+    # Set DB context for Authlib storage functions
+    set_db(db)
+    
+    # Validate client
+    client = query_client(client_id)
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid client_id"
+        )
+    
+    # For now, render a simple authorization page
+    # In production, this would integrate with your auth system (CAS, etc.)
+    return templates.TemplateResponse(
+        "authorize.html",
+        {
+            "request": request,
+            "client_name": client.client_metadata.get("client_name", client_id),
+            "scope": scope,
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": response_type,
+            "state": state,
+            "code_challenge": code_challenge or "",
+            "code_challenge_method": code_challenge_method or "",
+        }
+    )
 
-@router.post("/oauth/revoke")
-async def revoke_token(request: Request):
-    oauth_req = await ASGIOAuthRequest.from_starlette(request)
-    return Response(content=b"TODO", status_code=501)
+
+@router.post("/authorize")
+async def authorize_post(
+    request: Request,
+    db: Session = Depends(get_db),
+    confirm: str = Form(...),
+    client_id: str = Form(...),
+    redirect_uri: str = Form(...),
+    response_type: str = Form(...),
+    scope: str = Form(default=""),
+    state: str = Form(default=""),
+    code_challenge: str = Form(default=""),
+    code_challenge_method: str = Form(default=""),
+    fbbid: int = Form(...),  # User identifier, passed from auth system
+):
+    """
+    Handle POST request to authorization endpoint.
+    
+    Processes the user's consent and creates an authorization code.
+    """
+    set_db(db)
+    
+    if confirm != "yes":
+        # User denied authorization
+        error_uri = f"{redirect_uri}?error=access_denied&error_description=User+denied+authorization"
+        if state:
+            error_uri += f"&state={state}"
+        return RedirectResponse(url=error_uri, status_code=status.HTTP_302_FOUND)
+    
+    # Build OAuth request from form data
+    oauth_request = await ASGIOAuthRequest.from_starlette(request)
+    
+    # Create authorization response
+    try:
+        response = authorization_server.create_authorization_response(
+            request=oauth_request,
+            grant_user=fbbid,
+        )
+        
+        # Extract redirect URL from response
+        if hasattr(response, "location"):
+            return RedirectResponse(
+                url=response.location,
+                status_code=status.HTTP_302_FOUND
+            )
+        
+        # Fallback: return JSON response
+        return JSONResponse(content=response)
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.post("/token")
+async def token_endpoint(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    OAuth2 token endpoint.
+    
+    Exchanges authorization codes for access tokens,
+    or refreshes access tokens using refresh tokens.
+    """
+    set_db(db)
+    
+    oauth_request = await ASGIOAuthRequest.from_starlette(request)
+    
+    try:
+        response = authorization_server.create_token_response(request=oauth_request)
+        
+        # Authlib returns a tuple (status, headers, body) or similar
+        if isinstance(response, tuple):
+            status_code, headers, body = response
+            return JSONResponse(
+                content=body if isinstance(body, dict) else {},
+                status_code=status_code,
+                headers=dict(headers) if headers else None
+            )
+        
+        return JSONResponse(content=response)
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.post("/revoke")
+async def revoke_endpoint(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    OAuth2 token revocation endpoint (RFC 7009).
+    
+    Revokes access tokens or refresh tokens.
+    """
+    set_db(db)
+    
+    oauth_request = await ASGIOAuthRequest.from_starlette(request)
+    
+    try:
+        response = authorization_server.create_endpoint_response(
+            name="revocation",
+            request=oauth_request
+        )
+        
+        if isinstance(response, tuple):
+            status_code, headers, body = response
+            return JSONResponse(
+                content=body if isinstance(body, dict) else {},
+                status_code=status_code,
+                headers=dict(headers) if headers else None
+            )
+        
+        # Successful revocation returns 200 with empty body
+        return JSONResponse(content={}, status_code=status.HTTP_200_OK)
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.get("/introspect")
+async def introspect_endpoint(
+    request: Request,
+    db: Session = Depends(get_db),
+    token: str = Query(...),
+):
+    """
+    OAuth2 token introspection endpoint (RFC 7662).
+    
+    Returns metadata about a token.
+    """
+    set_db(db)
+    
+    # For now, return a basic implementation
+    # In production, this would validate the token and return its metadata
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Token introspection not yet implemented"
+    )

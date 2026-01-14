@@ -1,103 +1,159 @@
-# Gateway – FastAPI
+# Gateway API
 
-Gateway service built with **FastAPI**, responsible for OAuth2 flows and shared
-infrastructure such as database session handling, middleware, and core models.
+OAuth2 Gateway API built with FastAPI, Python 3.14, and uv.
 
----
+## Overview
 
-## Tech Stack
+This service provides OAuth2 authorization server functionality, migrated from the Flask-based implementation in the legacy `api` project.
 
-- Python 3.14
-- FastAPI
-- Uvicorn
-- SQLAlchemy
-- Authlib
-- uv (dependency & runtime management)
+## Features
 
----
+- **OAuth2 Authorization Code Flow** with PKCE support
+- **Refresh Token Grant** for token renewal
+- **Token Revocation** (RFC 7009)
+- Pure SQLAlchemy models (no Flask-SQLAlchemy dependency)
+- FastAPI with async support
+- Authlib integration for OAuth2 compliance
 
-## Repository Structure
+## Requirements
 
+- Python 3.14+
+- uv (package manager)
 
----
+## Quick Start
 
-## Local Development
+### 1. Install uv (if not already installed)
 
-### Install dependencies
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
-uv pip install -r requirements.txt --index-strategy unsafe-best-match
+### 2. Set up the project
 
-yaml
-Copy code
+```bash
+cd ~/fundbox/new_api/gateway
 
-Package indexes (internal and public) are configured in `uv.toml`.
+# Create virtual environment and install dependencies
+uv sync
 
----
+# Or with development dependencies
+uv sync --dev
+```
 
-### Run the service locally
+### 3. Configure environment
 
-uv run python -m uvicorn gateway.main:app
---reload
---port 8001
---app-dir src
+Create a `.env` file or set environment variables:
 
-arduino
-Copy code
+```bash
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/gateway
 
-Service will be available at:
+# Optional: Enable SQL logging
+SQL_ECHO=false
+```
 
-http://127.0.0.1:8001
+### 4. Run the development server
 
-yaml
-Copy code
+```bash
+./run_dev.sh
 
----
+# Or manually:
+uv run uvicorn gateway.main:app --reload --host 0.0.0.0 --port 8000
+```
 
-## OAuth2 Support
+### 5. Access the API
 
-The gateway implements OAuth2 endpoints using **Authlib**, including:
+- API docs: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+- Health check: http://localhost:8000/health
 
-- Authorization Code Grant
-- Refresh Token Grant
-- Token issuance
-- Token revocation
+## Project Structure
 
-OAuth2 data is persisted using SQLAlchemy models.
+```
+gateway/
+├── pyproject.toml          # Project configuration (uv/pip)
+├── run_dev.sh              # Development server script
+├── src/
+│   └── gateway/
+│       ├── __init__.py
+│       ├── main.py         # FastAPI application entry point
+│       ├── db/
+│       │   ├── base.py     # SQLAlchemy declarative base
+│       │   ├── context.py  # DB context for request scope
+│       │   └── session.py  # Session management
+│       ├── errors/
+│       │   ├── exceptions.py
+│       │   └── handlers.py
+│       ├── middleware/
+│       │   └── db/
+│       │       └── db_session.py
+│       ├── models/
+│       │   ├── oauth2_client.py
+│       │   ├── oauth2_token.py
+│       │   └── oauth2_authorization_code.py
+│       ├── oauth2/
+│       │   ├── __init__.py
+│       │   ├── asgi_request.py        # ASGI/Authlib adapter
+│       │   ├── authorization_code_grant.py
+│       │   ├── oauth2_manager.py      # Client management
+│       │   ├── refresh_token_grant.py
+│       │   ├── router.py              # OAuth2 endpoints
+│       │   ├── server.py              # Authorization server config
+│       │   ├── storage.py             # Token/client storage
+│       │   └── token_router.py        # External auth service endpoints
+│       ├── routers/
+│       │   └── debug.py
+│       └── templates/
+│           └── authorize.html
+└── tests/
+```
 
-Integration with external authentication services (SDK or direct HTTP)
-is intentionally decoupled and can be adapted per environment.
+## OAuth2 Endpoints
 
----
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/oauth/authorize` | GET | Display authorization consent page |
+| `/oauth/authorize` | POST | Process user consent, issue auth code |
+| `/oauth/token` | POST | Exchange auth code for tokens |
+| `/oauth/revoke` | POST | Revoke access or refresh token |
+| `/oauth/external/token` | POST | Token via external auth service |
+| `/oauth/external/revoke` | POST | Revoke via external auth service |
 
-## Dependency Management
+## Development
 
-Source dependencies are defined in:
+### Running tests
 
-- `requirements.in`
-- `requirements-fundbox.in` (optional / internal)
+```bash
+uv run pytest
+```
 
-Locked dependencies are generated into:
+### Linting
 
-- `requirements.txt`
+```bash
+uv run ruff check src/
+uv run ruff format src/
+```
 
-To regenerate dependencies:
+### Adding dependencies
 
-uv pip compile requirements.in -o requirements.txt --index-strategy unsafe-best-match
+```bash
+# Add a runtime dependency
+uv add <package>
 
-yaml
-Copy code
+# Add a dev dependency
+uv add --dev <package>
+```
 
----
+## Migration from Flask
 
-## Development Guidelines
+This project was migrated from the Flask-based `api/src/oauth2` module. Key changes:
 
-- Always use `uv run python` (do not use system Python)
-- `.venv/` and IDE files are ignored by Git
-- Keep commits small and scoped (scaffold, oauth2, db, config)
+1. **Flask-SQLAlchemy → Pure SQLAlchemy**: Models use `DeclarativeBase` and `mapped_column`
+2. **Flask routes → FastAPI routers**: Using `APIRouter` with Pydantic validation
+3. **Werkzeug → secrets**: Using stdlib `secrets` module for token generation
+4. **Request handling**: Custom `ASGIOAuthRequest` adapter for Authlib compatibility
+5. **Context-based sessions**: Using `contextvars` for request-scoped DB sessions
 
----
+## License
 
-## Status
-
-Work in progress.  
-FastAPI migration and OAuth2 infrastructure are actively under development.
+Proprietary - Fundbox

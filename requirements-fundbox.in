@@ -1,9 +1,0 @@
-fundbox.common.discovery>=1.2.0,<2
-fundbox.common.logging>=1.0.0,<2
-fundbox.common.pyutils>=2.0.0,<3
-fundbox.common.monitoring>=1.5.0,<2.0.0
-fundbox.common.system-flags>=1.0.0,<2
-fundbox.common.encryption>=2.0.0,<3
-fundbox.common.redis_utils>=1.0.0,<2
-fundbox.common.service_client
-fundbox.sdk.authentication

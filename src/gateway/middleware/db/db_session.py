@@ -1,4 +1,9 @@
-# src/gateway/middleware/db/session.py
+"""
+Database session middleware.
+
+Provides request-scoped database sessions for FastAPI endpoints.
+"""
+
 from __future__ import annotations
 
 from typing import Callable
