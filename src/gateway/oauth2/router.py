@@ -20,8 +20,8 @@ from starlette.templating import Jinja2Templates
 from gateway.db import get_db
 from gateway.db.context import set_db
 from gateway.oauth2.asgi_request import ASGIOAuthRequest
-from gateway.oauth2.server import authorization_server
-from gateway.oauth2.storage import query_client
+#from gateway.oauth2.server import authorization_server
+#from gateway.oauth2.storage import query_client
 
 router = APIRouter(prefix="/oauth", tags=["oauth2"])
 
@@ -54,12 +54,12 @@ async def authorize_get(
     set_db(db)
     
     # Validate client
-    client = query_client(client_id)
-    if not client:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid client_id"
-        )
+  #  client = query_client(client_id)
+   # if not client:
+    #    raise HTTPException(
+     #       status_code=status.HTTP_400_BAD_REQUEST,
+      #      detail="Invalid client_id"
+       # )
     
     # For now, render a simple authorization page
     # In production, this would integrate with your auth system (CAS, etc.)
@@ -67,7 +67,7 @@ async def authorize_get(
         "authorize.html",
         {
             "request": request,
-            "client_name": client.client_metadata.get("client_name", client_id),
+   #         "client_name": client.client_metadata.get("client_name", client_id),
             "scope": scope,
             "client_id": client_id,
             "redirect_uri": redirect_uri,
@@ -111,27 +111,27 @@ async def authorize_post(
     oauth_request = await ASGIOAuthRequest.from_starlette(request)
     
     # Create authorization response
-    try:
-        response = authorization_server.create_authorization_response(
-            request=oauth_request,
-            grant_user=fbbid,
-        )
+    #try:
+    #    response = authorization_server.create_authorization_response(
+     #       request=oauth_request,
+      #      grant_user=fbbid,
+       # )
         
         # Extract redirect URL from response
-        if hasattr(response, "location"):
-            return RedirectResponse(
-                url=response.location,
-                status_code=status.HTTP_302_FOUND
-            )
+        #if hasattr(response, "location"):
+         #   return RedirectResponse(
+          #      url=response.location,
+           #     status_code=status.HTTP_302_FOUND
+            #)
         
         # Fallback: return JSON response
-        return JSONResponse(content=response)
+        #return JSONResponse(content=response)
         
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+    #except Exception as e:
+     #   raise HTTPException(
+      #      status_code=status.HTTP_400_BAD_REQUEST,
+       #     detail=str(e)
+       # )
 
 
 @router.post("/token")
@@ -149,25 +149,25 @@ async def token_endpoint(
     
     oauth_request = await ASGIOAuthRequest.from_starlette(request)
     
-    try:
-        response = authorization_server.create_token_response(request=oauth_request)
+   # try:
+        #response = authorization_server.create_token_response(request=oauth_request)
         
         # Authlib returns a tuple (status, headers, body) or similar
-        if isinstance(response, tuple):
-            status_code, headers, body = response
-            return JSONResponse(
-                content=body if isinstance(body, dict) else {},
-                status_code=status_code,
-                headers=dict(headers) if headers else None
-            )
+       # if isinstance(response, tuple):
+        #    status_code, headers, body = response
+         #   return JSONResponse(
+           #     content=body if isinstance(body, dict) else {},
+          #     status_code=status_code,
+           #     headers=dict(headers) if headers else None
+            #)
         
-        return JSONResponse(content=response)
+        #return JSONResponse(content=response)
         
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+   # except Exception as e:
+    #    raise HTTPException(
+     #       status_code=status.HTTP_400_BAD_REQUEST,
+      #      detail=str(e)
+       # )
 
 
 @router.post("/revoke")
@@ -185,18 +185,18 @@ async def revoke_endpoint(
     oauth_request = await ASGIOAuthRequest.from_starlette(request)
     
     try:
-        response = authorization_server.create_endpoint_response(
-            name="revocation",
-            request=oauth_request
-        )
+        # response = authorization_server.create_endpoint_response(
+          #  name="revocation",
+           # request=oauth_request
+        #)
         
-        if isinstance(response, tuple):
-            status_code, headers, body = response
-            return JSONResponse(
-                content=body if isinstance(body, dict) else {},
-                status_code=status_code,
-                headers=dict(headers) if headers else None
-            )
+        #if isinstance(response, tuple):
+         #   status_code, headers, body = response
+          #  return JSONResponse(
+           #     content=body if isinstance(body, dict) else {},
+            #    status_code=status_code,
+             #   headers=dict(headers) if headers else None
+            #)
         
         # Successful revocation returns 200 with empty body
         return JSONResponse(content={}, status_code=status.HTTP_200_OK)

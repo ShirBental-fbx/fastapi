@@ -5,7 +5,7 @@ set -e
 
 # Default values
 HOST="${HOST:-0.0.0.0}"
-PORT="${PORT:-8000}"
+PORT="${PORT:-8002}"
 RELOAD="${RELOAD:-true}"
 
 echo "Starting Gateway API..."

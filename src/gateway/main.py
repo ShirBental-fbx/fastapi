@@ -20,7 +20,7 @@ from gateway.errors.handlers import (
     validation_exception_handler,
 )
 from gateway.middleware.db.db_session import db_session_middleware
-from gateway.oauth2.router import router as oauth2_router
+#from gateway.oauth2.router import router as oauth2_router
 from gateway.oauth2.token_router import router as token_router
 from gateway.routers.debug import router as debug_router
 
@@ -50,12 +50,12 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 # Routers
 app.include_router(debug_router)
-app.include_router(oauth2_router)
+#app.include_router(oauth2_router)
 app.include_router(token_router)
 
 
 @app.get("/health")
-def health():
+async def health():
     """Health check endpoint."""
     return {"status": "ok"}
 
